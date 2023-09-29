@@ -2,14 +2,14 @@ import pygame, sys, asyncio
 from time import sleep
 from os import walk
 from src.settings import *
-from src.support import exit, save, load, drawText, Button
+from src.support import exit, save, load, draw_text, Button
 from src.debug import debug
 from src.tile import Tile
 
 pygame.init()
 clock = pygame.time.Clock()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption(TITLE)
+clock.get_fps()
 
 saveText = ''
 moveX = 0
@@ -17,59 +17,63 @@ moveY = 0
 speed = 20
 inc = 0
 targetState = 0
-TILE_GRID_SIZE = 60
+TILE_GRID_SIZE = 150
 TILES = []
+
 
 def generate(width, height, surf, tileSize):
     global TILES
     for y in range(width):
         row = []
         for x in range(height):
-            newTile = Tile(x,y , surf, tileSize)
+            newTile = Tile(x, y, surf, tileSize)
             row.append(newTile)
         TILES.append(row)
 
-def processState():
+
+def process_state():
     global TILES
     newTiles = []
     for row in TILES:
         newRow = []
         for tile in row:
+            if tile.state == 0:
+                newRow.append(create_tile(tile, 0))
+                continue
             charge = 0
             for x in range(-1, 2):
                 for y in range(-1, 2):
-                    if (x == 0 and y == 0) or tile.y + y < 0 or tile.y + y > TILE_GRID_SIZE - 1 or tile.x + x < 0 or tile.x + x > TILE_GRID_SIZE - 1: pass
+                    if (x == 0 and y == 0) or tile.y + y < 0 or tile.y + y > TILE_GRID_SIZE - 1 or \
+                            tile.x + x < 0 or tile.x + x > TILE_GRID_SIZE - 1:
+                        pass
                     else:
                         if TILES[tile.y + y][tile.x + x].state == 2:
                             charge += 1
+            if tile.state == 1:
+                if charge == 1 or charge == 2:
+                    newRow.append(create_tile(tile, 2))
+                else:
+                    newRow.append(create_tile(tile, 1))
 
-            if tile.state == 0:
-                newRow.append(createTile(tile, 0))
+            elif tile.state == 2:
+                newRow.append(create_tile(tile, 3))
 
-            else:
-                if tile.state == 1:
-                    if charge == 1 or charge == 2:
-                        newRow.append(createTile(tile, 2))
-                    else:
-                        newRow.append(createTile(tile, 1))
-
-                elif tile.state == 2:
-                    newRow.append(createTile(tile, 3))
-
-                elif tile.state == 3:
-                    newRow.append(createTile(tile, 1))
+            elif tile.state == 3:
+                newRow.append(create_tile(tile, 1))
 
         newTiles.append(newRow)
     TILES = newTiles
     sleep(0.1)
 
-def createTile(tile, state):
+
+def create_tile(tile, state):
     newTile = Tile(tile.x, tile.y, tile.displaySurf, tile.size)
     newTile.moveX, newTile.moveY = tile.moveX, tile.moveY
     newTile.state = state
     return newTile
 
-async def saveMenu():
+
+async def save_menu():
     global saveText
     running = True
     clicking = False
@@ -77,7 +81,7 @@ async def saveMenu():
 
     while running:
 
-        screen.fill('black')
+        screen.fill('blue')
         mousePos = pygame.mouse.get_pos()
 
         box = pygame.Rect(int(WIDTH / 2) - 150, int(HEIGHT / 2) - 115, 200, 130)
@@ -87,7 +91,7 @@ async def saveMenu():
         textRender = FONT.render(saveText, 1, 'white')
 
         if button0.isOver(mousePos) and clicking and len(saveText) != 0:
-            save('src/saves/' + saveText + '.txt', TILES)
+            save('src/saves/' + saveText + '.sav', TILES)
             saveText = ''
             running = False
             sleep(0.1)
@@ -128,12 +132,12 @@ async def saveMenu():
         clock.tick(FPS)
         await asyncio.sleep(0)
 
-async def loadMenu():
+
+async def load_menu():
     running = True
     clicking = False
 
     while running:
-
         screen.fill('black')
         mousePos = pygame.mouse.get_pos()
 
@@ -150,8 +154,9 @@ async def loadMenu():
             for fileIndex, file in enumerate(files):
                 if fileIndex < 10:
                     text = str(file)
-                    newText = text.split('.txt')
-                    button = Button('red', ((templateBox.x + 20) + incrementX), templateBox.y + incrementY, 100, 20, newText[0].title())
+                    newText = text.split('.sav')
+                    button = Button('red', ((templateBox.x + 20) + incrementX), templateBox.y + incrementY, 100, 20,
+                                    newText[0].title())
                     incrementY += 30
                     if button.isOver(mousePos) and clicking:
                         load('src/references/' + file, TILES)
@@ -163,7 +168,8 @@ async def loadMenu():
                     incrementX = 125
                     text = str(file)
                     newText = text.split('.txt')
-                    button = Button('red', templateBox.x + incrementX, templateBox.y + incrementYW, 100, 20, newText[0].title())
+                    button = Button('red', templateBox.x + incrementX, templateBox.y + incrementYW, 100, 20,
+                                    newText[0].title())
                     incrementYW += 30
                     if button.isOver(mousePos) and clicking:
                         load('src/references/' + file, TILES)
@@ -198,8 +204,9 @@ async def loadMenu():
         clock.tick(FPS)
         await asyncio.sleep(0)
 
-async def Options():
-    global TILE_GRID_SIZE
+
+async def options():
+    global TILE_GRID_SIZE, TILES
     running = True
     clicking = False
 
@@ -207,23 +214,31 @@ async def Options():
         screen.fill('black')
         mousePos = pygame.mouse.get_pos()
 
-        box = pygame.Rect(int(WIDTH/2)-150, int(HEIGHT/2)-115, 200, 200)
-        button0 = Button('red', int(WIDTH/2) - 100, int(HEIGHT/2)-100, 100, 50, 'save')
-        button1 = Button('red', int(WIDTH/2) - 100, int(HEIGHT/2)-40, 100, 50, 'load')
-        button2 = Button('red', int(WIDTH/2) - 100, int(HEIGHT/2) + 20, 100, 50, 'exit')
+        box = pygame.Rect(int(WIDTH / 2) - 150, int(HEIGHT / 2) - 115, 200, 260)
+        button0 = Button('red', int(WIDTH / 2) - 100, int(HEIGHT / 2) - 100, 100, 50, 'save')
+        button1 = Button('red', int(WIDTH / 2) - 100, int(HEIGHT / 2) - 40, 100, 50, 'load')
+        button2 = Button('red', int(WIDTH / 2) - 100, int(HEIGHT / 2) + 20, 100, 50, 'exit')
+        button3 = Button('red', int(WIDTH / 2) - 100, int(HEIGHT / 2) + 80, 100, 50, 'rest')
 
         if button0.isOver(mousePos) and clicking:
             sleep(0.1)
-            await saveMenu()
+            await save_menu()
             running = False
 
         if button1.isOver(mousePos) and clicking:
             sleep(0.1)
-            await loadMenu()
+            await load_menu()
             running = False
 
         if button2.isOver(mousePos) and clicking:
             exit()
+
+        if button3.isOver(mousePos) and clicking:
+            sleep(0.1)
+            TILES = []
+            generate(TILE_GRID_SIZE, TILE_GRID_SIZE, screen, TILE_SIZE)
+            running = False
+
 
         clicking = False
         for event in pygame.event.get():
@@ -241,10 +256,12 @@ async def Options():
         button0.draw(screen, 'white', 15, 15)
         button1.draw(screen, 'white', 15, 15)
         button2.draw(screen, 'white', 15, 15)
+        button3.draw(screen, 'white', 15, 15)
 
         pygame.display.flip()
         clock.tick(FPS)
         await asyncio.sleep(0)
+
 
 async def main():
     global targetState, moveX, moveY, speed, screen, clock, TILE_GRID_SIZE, inc
@@ -308,20 +325,28 @@ async def main():
         keys = pygame.key.get_pressed()
 
         if keys[pygame.K_SPACE]:
-            processState()
-            pygame.image.save(screen, 'animations/xorGate/' + str(inc) + '.png')
+            process_state()
             inc += 1
 
         screen.fill('black')
-        if keys[pygame.K_1]: targetState = 1
-        if keys[pygame.K_2]: targetState = 2
-        if keys[pygame.K_3]: targetState = 3
+        textFps = FONT.render(f'{round(clock.get_fps(), 2)}', 1, 'green')
+        if keys[pygame.K_1]:
+            targetState = 1
+        if keys[pygame.K_2]:
+            targetState = 2
+        if keys[pygame.K_3]:
+            targetState = 3
         # if keys[pygame.K_z]: save('src/references/basic elements.txt', TILES)
-        if keys[pygame.K_ESCAPE]: await Options()
-        if keys[pygame.K_w]: moveY += speed
-        if keys[pygame.K_a]: moveX += speed
-        if keys[pygame.K_s]: moveY -= speed
-        if keys[pygame.K_d]: moveX -= speed
+        if keys[pygame.K_ESCAPE]:
+            await options()
+        if keys[pygame.K_w]:
+            moveY += speed
+        if keys[pygame.K_a]:
+            moveX += speed
+        if keys[pygame.K_s]:
+            moveY -= speed
+        if keys[pygame.K_d]:
+            moveX -= speed
         if keys[pygame.K_r]:
             for row in TILES:
                 for tile in row:
@@ -336,17 +361,19 @@ async def main():
                 if pygame.Rect((tile.x * tile.size + moveX,
                                 tile.y * tile.size + tile.moveY),
                                (tile.size, tile.size)).collidepoint(pygame.mouse.get_pos()):
-                    drawText(f'{tile.x, tile.y}', 'green', screen, 1165, 690, FONT)
+                    draw_text(f'{tile.x, tile.y}', 'green', screen, 1165, 690, FONT)
 
         if targetState == 0:
             pygame.draw.circle(screen, 'white', (40, HEIGHT - 40), 30)
         else:
             pygame.draw.circle(screen, COLORS[targetState], (40, HEIGHT - 40), 30)
 
+        screen.blit(textFps, (10, 10))
         # debug(f'{clock}')
         pygame.display.flip()
         clock.tick(FPS)
         await asyncio.sleep(0)
+
 
 if __name__ == '__main__':
     asyncio.run(main())

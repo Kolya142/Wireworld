@@ -1,39 +1,51 @@
 import pygame, sys
 from src.settings import *
+import struct
+
 
 def exit():
     pygame.quit()
     sys.exit()
 
-def drawText(text, color, surf, x, y, font):
+
+def draw_text(text, color, surf, x, y, font):
     textRender = font.render(text, 1, color)
     textRect = textRender.get_rect()
     textRect.topleft = (x, y)
     surf.blit(textRender, textRect)
 
+
 def save(path, iterator):
-    cells = ""
-    with open(path, 'w') as file:
+    with open(path, 'wb') as file:
         for row in iterator:
-            line = ""
             for tile in row:
-                line += str(tile.state) + " "
-            cells += line + '\n'
-        file.write(cells)
+                if tile.state == 0:
+                    continue
+                x = struct.pack("h", tile.x)
+                y = struct.pack("h", tile.y)
+                s = struct.pack("h", tile.state)
+                file.write(x)
+                file.write(y)
+                file.write(s)
+
 
 def load(path, tiles):
-    with open(path, 'r') as file:
-        y, x = 0, 0
-        for row in file:
-            x = 0
-            line = row.split()
-            for tile in line:
-                tiles[y][x].state = int(tile)
-                x += 1
-            y += 1
+    with open(path, 'rb') as file:
+        while True:
+            d = file.read(2)
+            if not d:
+                break
+            x_ = struct.unpack('h', d)[0]
+            y_ = struct.unpack('h', file.read(2))[0]
+            s = struct.unpack('h', file.read(2))[0]
+            for y in range(len(tiles)):
+                for x in range(len(tiles[y])):
+                    if x == x_ and y == y_:
+                        tiles[y][x].state = s
+
 
 class Button:
-    def __init__(self, color, x, y, width, height, text = ''):
+    def __init__(self, color, x, y, width, height, text=''):
         super().__init__()
         self.color = color
         self.x = x
@@ -43,7 +55,7 @@ class Button:
         self.text = text
         self.active = True
 
-    def draw(self, surf, color: str, ofsX: int = 0, ofsY: int = 0, small: bool = False, outline = None,):
+    def draw(self, surf, color: str, ofsX: int = 0, ofsY: int = 0, small: bool = False, outline=None, ):
         if not self.active:
             if outline:
                 pygame.draw.rect(surf, outline, (self.x - 2, self.y - 2, self.width + 4, self.height + 4), 0)
@@ -54,9 +66,9 @@ class Button:
 
         if self.text != '':
             if not small:
-                drawText(self.text, color, surf, self.x + ofsX, self.y + ofsY, FONT)
+                draw_text(self.text, color, surf, self.x + ofsX, self.y + ofsY, FONT)
             else:
-                drawText(self.text, color, surf, self.x + ofsX, self.y + ofsY, SMALL_FONT)
+                draw_text(self.text, color, surf, self.x + ofsX, self.y + ofsY, SMALL_FONT)
 
     def toggleActive(self):
         if self.active:
